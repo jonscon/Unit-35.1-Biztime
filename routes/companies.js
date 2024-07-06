@@ -1,4 +1,5 @@
 const express = require("express");
+const slugify = require("slugify");
 const ExpressError = require("../expressError");
 const db = require("../db");
 
@@ -52,7 +53,7 @@ router.post('/', async function(req, res, next) {
         const results = await db.query(
             `INSERT INTO companies (code, name, description)
             VALUES ($1, $2, $3)
-            RETURNING code, name, description`, [code, name, description]
+            RETURNING code, name, description`, [slugify(code), name, description]
         );
 
         return res.status(201).json({ company: results.rows[0] });
@@ -94,7 +95,7 @@ router.delete('/:code', async function(req, res, next) {
         if (results.rows.length === 0) {
             throw new ExpressError(`No companies found under ${req.params.code}.`, 404);
         }
-        return res.json({ status : "deleted" })
+        return res.status(201).json({ status : "deleted" })
     } catch(err) {
         return next(err);
     }

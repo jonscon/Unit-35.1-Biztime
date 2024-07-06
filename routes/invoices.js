@@ -77,21 +77,41 @@ router.post('/', async function(req, res, next) {
 
 router.put('/:id', async function(req, res, next) {
     try {
-        // Get new invoice amount from req.body
-        const { amt } = req.body;
+        // Get new invoice amount and paid from req.body
+        let {amt, paid} = req.body;
+        let id = req.params.id;
+        let paidDate = null;
+        
+        const currResult = await db.query(
+            `SELECT paid
+             FROM invoices
+             WHERE id = $1`,
+          [id]);
+  
+        // Return 404 error if company code cannot be found
+        if (currResult.rows.length === 0) {
+            throw new ExpressError(`No invoices found under ${req.params.id}.`, 404);
+        }
+
+        const currPaidDate = currResult.rows[0].paid_date;
+
+        if (!currPaidDate && paid) {
+            paidDate = new Date();
+          } else if (!paid) {
+            paidDate = null
+          } else {
+            paidDate = currPaidDate;
+          }
 
         // Run query to update company information
         const results = await db.query(
-            `UPDATE invoices SET amt=$1
-            WHERE id=$2
-            RETURNING id, comp_code, amt, paid, add_date, paid_date`, [amt, req.params.id]
-        );
-
-        // Return 404 error if company code cannot be found
-        if (results.rows.length === 0) {
-            throw new ExpressError(`No invoices found under ${req.params.id}.`, 404);
-        }
-        return res.status(201).json({ invoice : results.rows[0] });
+            `UPDATE invoices
+             SET amt=$1, paid=$2, paid_date=$3
+             WHERE id=$4
+             RETURNING id, comp_code, amt, paid, add_date, paid_date`,
+          [amt, paid, paidDate, id]);
+  
+        return res.status(201).json({"invoice": results.rows[0]});
     } catch(err) {
         return next(err);
     }
@@ -108,7 +128,7 @@ router.delete('/:id', async function(req, res, next) {
         if (results.rows.length === 0) {
             throw new ExpressError(`No invoices found under ${req.params.id}.`, 404);
         }
-        return res.json({ status : "deleted" })
+        return res.status(201).json({ status : "deleted" })
     } catch(err) {
         return next(err);
     }
